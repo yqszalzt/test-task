@@ -20,10 +20,10 @@ class Department(BaseModel):
     )
 
     def __str__(self):
-        return f"Department(id={self.id}, name='{self.name}', parent_id={self.parent_id_id})"
+        return f"Department(id={self.id}, name='{self.name}', parent_id={self.parent_id})"
     
     def save(self, *args, **kwargs):
-        if self.parent_id and self.parent_id_id == self.id:
+        if self.parent_id and self.parent_id == self.id:
             raise ValueError("A department cannot be its own parent.")
         super().save(*args, **kwargs)
     
@@ -33,7 +33,7 @@ class Department(BaseModel):
 
 
 class Employee(BaseModel):
-    department = models.ForeignKey(Department, on_delete=models.CASCADE)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, related_name='employees')
     full_name = models.CharField(max_length=200)
     position = models.CharField(max_length=200)
     hired_at = models.DateField(null=True, blank=True)

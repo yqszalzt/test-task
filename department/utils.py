@@ -11,22 +11,20 @@ def is_in_subtree(node: Department, ancestor_id: int) -> bool:
     return False
 
 
-def build_department_tree(department: Department, depth: int, include_employees: bool) -> dict:
-    """
-    Рекурсивно строит дерево подразделений до указанной глубины.
-    На каждом уровне - данные отдела, опционально сотрудники, опционально children
-    """
+def build_department_tree(department, depth, include_employees):
     data = DepartmentSerializer(department).data
 
     if include_employees:
-        employees = department.employees.order_by("full_name")
-        data["employees"] = EmployeeSerializer(employees, many=True).data
+        data["employees"] = EmployeeSerializer(
+            department.employees.order_by("full_name"), many=True
+        ).data
+    else:
+        data["employees"] = []
 
     if depth > 1:
-        children = department.children.all()
         data["children"] = [
             build_department_tree(child, depth - 1, include_employees)
-            for child in children
+            for child in department.children.all()
         ]
     else:
         data["children"] = []

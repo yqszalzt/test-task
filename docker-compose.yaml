@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16
+    env_file:
+      - .env.prod
+    ports:
+      - "6543:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d departmentdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    command: >
+      sh -c "uv run manage.py migrate &&
+             uv run manage.py collectstatic --noinput &&
+             uv run uvicorn backend.asgi:application --host 0.0.0.0 --port 8000"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.prod
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

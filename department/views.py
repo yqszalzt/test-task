@@ -12,6 +12,25 @@ from .serializers import DepartmentSerializer, EmployeeSerializer, DepartmentDet
 from .utils import build_department_tree, is_in_subtree
 
 
+class DepartmentAddView(APIView):
+    throttle_classes = [AnonRateThrottle]
+
+    @extend_schema(
+        summary="Создать подразделение",
+        request=DepartmentSerializer,
+        responses={201: DepartmentSerializer},
+        tags=["departments"],
+    )
+    def post(self, request):
+        serializer = DepartmentSerializer(data=request.data)
+        if serializer.is_valid():
+            department = serializer.save()
+            return SuccessResponse(
+                data=DepartmentSerializer(department).data,
+                status=status.HTTP_201_CREATED,
+            )
+        return ErrorResponse(error=serializer.errors)
+
 class DepartmentView(APIView):
     throttle_classes = [AnonRateThrottle]
 
@@ -25,6 +44,9 @@ class DepartmentView(APIView):
         tags=["departments"],
     )
     def get(self, request, department_id):
+        if department_id is None:
+            return ErrorResponse(error="department_id is required.", status=status.HTTP_400_BAD_REQUEST)
+
         department = get_object_or_404(Department, id=department_id)
 
         depth = int(request.query_params.get("depth", 1))
@@ -35,47 +57,30 @@ class DepartmentView(APIView):
         return SuccessResponse(data=data)
 
     @extend_schema(
-    summary="Создать подразделение",
-    request=DepartmentSerializer,
-    responses={201: DepartmentSerializer},
-    tags=["departments"],
-    )
-    def post(self, request):
-        serializer = DepartmentSerializer(data=request.data)
-        if serializer.is_valid():
-            department = serializer.save()
-            return SuccessResponse(
-                data=DepartmentSerializer(department).data,
-                status=status.HTTP_201_CREATED,
-            )
-        return ErrorResponse(error=serializer.errors)
-
-    @extend_schema(
         summary="Обновить подразделение (переименовать / переместить)",
         request=DepartmentSerializer,
         responses={200: DepartmentSerializer},
         tags=["departments"],
     )
     def patch(self, request, department_id):
+        if department_id is None:
+            return ErrorResponse(error="department_id is required.", status=status.HTTP_400_BAD_REQUEST)
         department = get_object_or_404(Department, id=department_id)
         serializer = DepartmentSerializer(department, data=request.data, partial=True)
 
         if serializer.is_valid():
-            new_parent_id = serializer.validated_data.get("parent_id")
+            new_parent_id = request.data.get("parent_id")
+            if new_parent_id is not None:
+                new_parent_id = int(new_parent_id)
 
-            # нельзя быть родителем самого себя
-            if new_parent_id == department.id:
-                raise ValidationError("A department cannot be its own parent.")
+                if new_parent_id == department.id:
+                    raise ValidationError("A department cannot be its own parent.")
 
-            # нельзя переместить внутрь своего поддерева
-            if new_parent_id and is_in_subtree(
-                get_object_or_404(Department, pk=new_parent_id),
-                department.id
-            ):
-                return ErrorResponse(
-                    "Cannot move a department into its own subtree.",
-                    status=status.HTTP_409_CONFLICT,
-                )
+                if is_in_subtree(get_object_or_404(Department, pk=new_parent_id), department.id):
+                    return ErrorResponse(
+                        error="Cannot move a department into its own subtree.",
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
             department = serializer.save()
             return SuccessResponse(data=DepartmentSerializer(department).data)
@@ -92,6 +97,8 @@ class DepartmentView(APIView):
         tags=["departments"],
     )
     def delete(self, request, department_id):
+        if department_id is None:
+            return ErrorResponse(error="department_id is required.", status=status.HTTP_400_BAD_REQUEST)
         department = get_object_or_404(Department, id=department_id)
         mode = request.query_params.get("mode", "cascade")
 
@@ -109,6 +116,7 @@ class DepartmentView(APIView):
             department.delete()
             return SuccessResponse(data=None, status=status.HTTP_204_NO_CONTENT)
 
+        return ErrorResponse(error="mode must be 'cascade' or 'reassign'.", status=status.HTTP_400_BAD_REQUEST)
 
 class EmployeeView(APIView):
     throttle_classes = [AnonRateThrottle]
@@ -119,7 +127,7 @@ class EmployeeView(APIView):
         responses={201: EmployeeSerializer},
         tags=["employees"],
     )
-    def post(self, request, department_id):
+    def post(self, request, department_id=None):
         try:
             department = Department.objects.get(id=department_id)
         except Department.DoesNotExist:
