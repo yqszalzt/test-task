@@ -4,12 +4,12 @@ REST API для управления организационной структ
 
 ## Стек
 
-- **Python 3.12** + **Django 5** + **Django REST Framework**
+- **Python 3.14** + **Django 5** + **Django REST Framework**
 - **PostgreSQL 16**
 - **uvicorn** (ASGI-сервер)
 - **uv** (менеджер зависимостей)
 - **drf-spectacular** (OpenAPI / Swagger)
-- **Docker** + **docker-compose**
+- **Docker, docker compose**
 
 ---
 
